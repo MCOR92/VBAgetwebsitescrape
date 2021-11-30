@@ -1,0 +1,67 @@
+Sub GetComment()
+    Dim book As Workbook
+    Dim sheet As Worksheet
+    Dim encodeMail As String
+    Dim cookieData As String
+    Dim row As Integer
+    Dim inData As String
+    Dim queryString As String
+    Dim fullURL As String
+    Dim whttp As Object
+    Dim cmtData As String
+    Dim cmtStatus As Object
+    Dim regEx As Object
+   
+    Set book = ThisWorkbook
+    Set sheet = book.Worksheets("Admin")
+    encodeMail = sheet.Cells(2, 2)
+    encodeMail = Replace(encodeMail, ".", "%2E")
+    encodeMail = Replace(encodeMail, "@", "%40")
+    cookieData = "biasValidUser=APPS=COM%2DTOOL&EMAIL=" & encodeMail & "&BIASUSERID=" & sheet.Cells(3, 2) & ";"
+'    Debug.Print cookieData
+   
+    Set sheet = book.Worksheets("CMT Data")
+    Set whttp = CreateObject("WinHTTP.WinHTTPrequest.5.1")
+   
+    Set regEx = CreateObject("vbscript.regexp")
+    With regEx
+        .Global = True
+        .MultiLine = True
+        .IgnoreCase = True
+        .Pattern = "----(Installation Pending|Cancelled|Installed|Change Pending|Cease Pending|Inactive|Ceased)"
+    End With
+   
+    row = 2
+    inData = sheet.Cells(row, 1)
+    Do While inData <> ""
+        If Len(inData) = 7 Then
+            queryString = "OID" ' Classic Order No
+        Else
+            queryString = "srn" ' Classic Service
+        End If
+        fullURL = "#URLFORWEBSITE" & queryString & "=" & inData
+'        Debug.Print fullURL
+        whttp.Open "GET", fullURL, False
+        whttp.SetRequestHeader "Cookie", cookieData
+        whttp.Send
+'        Debug.Print whttp.ResponseText
+        cmtData = whttp.ResponseText
+        Set cmtStatus = regEx.Execute(cmtData)
+'        Debug.Print cmtStatus.Count
+'        Debug.Print cmtStatus(0)
+        If cmtStatus.Count = 0 Then
+            sheet.Cells(row, 2) = "Not found or status not matched"
+        Else
+            sheet.Cells(row, 2) = Replace(cmtStatus(0), "----", "")
+            If cmtStatus.Count > 1 Then
+                sheet.Cells(row, 3) = Replace(cmtStatus(1), "----", "")
+            End If
+        End If
+'        sheet.Cells(row, 4) = cmtData
+        row = row + 1
+        inData = sheet.Cells(row, 1)
+    Loop
+   
+    Set whttp = Nothing
+    Set regEx = Nothing
+End Sub
